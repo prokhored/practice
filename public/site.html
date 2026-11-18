@@ -57,6 +57,9 @@
                     <li>
                         <p style="font-size: 20px;"> Подписки </p>
                     </li>
+                    <li>
+                        <button id="logout" class="logout-button" type="button">Выйти</button>
+                    </li>
 
                 </ul>
             </div>
@@ -78,7 +81,24 @@
 
 
 
-    <script src="./site.js"> </script>
+    <script src="./site.js"></script>
+    <script>
+        document.getElementById("logout").addEventListener("click", async () => {
+            try {
+                const response = await fetch("/logout", { method: "POST" });
+
+                if (!response.ok) {
+                    throw new Error("Не удалось завершить сессию");
+                }
+
+                const data = await response.json();
+                window.location.href = data.redirect || "/auth.html";
+            } catch (error) {
+                console.error(error);
+                alert("Не удалось выйти из аккаунта");
+            }
+        });
+    </script>
 </body>
 
 </html>
