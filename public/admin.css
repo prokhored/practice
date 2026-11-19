@@ -1,0 +1,135 @@
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background: #f5f5f5;
+}
+
+.admin-page {
+    display: flex;
+    justify-content: center;
+    padding: 40px 16px;
+}
+
+.admin-card {
+    width: min(600px, 100%);
+    padding: 24px;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 12px #0000001a;
+}
+
+.admin-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+h1 {
+    margin: 0 0 24px;
+}
+
+label {
+    display: block;
+    margin: 14px 0 6px;
+}
+
+input,
+textarea,
+button {
+    font: inherit;
+}
+
+input[type="text"],
+textarea,
+input[type="file"] {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+}
+
+textarea {
+    resize: vertical;
+}
+
+button {
+    border: 0;
+    border-radius: 6px;
+    padding: 10px 14px;
+    cursor: pointer;
+}
+
+#logout {
+    color: white;
+    background: #222;
+}
+
+.submit-button {
+    width: 100%;
+    margin-top: 20px;
+    color: white;
+    background: #d00;
+}
+
+#message {
+    min-height: 20px;
+    margin-bottom: 0;
+}
+
+h2 {
+    margin-top: 32px;
+}
+
+.admin-video {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 0;
+    border-top: 1px solid #eee;
+}
+
+.admin-video-info {
+    min-width: 0;
+}
+
+.admin-video-info strong,
+.admin-video-info small {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.admin-video-info small {
+    margin-top: 4px;
+    color: #777;
+}
+
+.admin-video-actions {
+    display: flex;
+    flex-shrink: 0;
+    gap: 8px;
+}
+
+.edit-button {
+    color: white;
+    background: #555;
+}
+
+.delete-button {
+    color: white;
+    background: #b00020;
+}
+
+@media (max-width: 600px) {
+    .admin-video {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+}

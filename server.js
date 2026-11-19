@@ -1,12 +1,15 @@
-const crypto = require("crypto");
+const bcrypt = require("bcrypt");
 const express = require("express");
 const session = require("express-session");
 const mariadb = require("mariadb");
 const path = require("path");
+const fsSync = require("fs");
 require("dotenv").config();
 
 const server = express();
 const appPath = path.join(__dirname, "public");
+const uploadPath = path.join(__dirname, "uploads");
+fsSync.mkdirSync(uploadPath, { recursive: true });
 
 server.use(express.urlencoded({ extended: true }));
 server.use(express.json());
@@ -16,7 +19,9 @@ server.use(session({
     saveUninitialized: false,
     cookie: { httpOnly: true, secure: false, maxAge: 86400000 }
 }));
-
+const multer = require('multer');
+const Client = require('ssh2-sftp-client');
+const fs = require('fs/promises');
 const conn = mariadb.createPool({
     host: process.env.host,
     user: process.env.user,
@@ -27,30 +32,24 @@ const conn = mariadb.createPool({
 
 function checkAuth(req, res, next) {
     if (req.session.user) return next();
+    if (req.path.startsWith("/api/")) {
+        return res.status(401).json({ error: "Требуется авторизация" });
+    }
     return res.redirect("/auth.html");
 }
 
-function hashPassword(password) {
-    return new Promise((resolve, reject) => {
-        const salt = crypto.randomBytes(16).toString("hex");
-        crypto.scrypt(password, salt, 64, (error, key) => {
-            if (error) return reject(error);
-            resolve(`${salt}:${key.toString("hex")}`);
-        });
-    });
+function checkAdmin(req, res, next) {
+    if (req.session.user && req.session.user.email === "admin") return next();
+    return res.redirect("/auth.html");
 }
 
-function verifyPassword(password, storedHash) {
-    return new Promise((resolve, reject) => {
-        const [salt, savedHex] = String(storedHash).split(":");
-        if (!salt || !savedHex) return resolve(false);
+async function hashPassword(password) {
+    return bcrypt.hash(password, 12);
+}
 
-        crypto.scrypt(password, salt, 64, (error, key) => {
-            if (error) return reject(error);
-            const savedKey = Buffer.from(savedHex, "hex");
-            resolve(savedKey.length === key.length && crypto.timingSafeEqual(savedKey, key));
-        });
-    });
+async function verifyPassword(password, storedHash) {
+    if (!String(storedHash).startsWith("$2")) return false;
+    return bcrypt.compare(password, storedHash);
 }
 
 function saveSession(req, res, user, status = 200, message = "Вход выполнен") {
@@ -73,6 +72,93 @@ server.get("/", (req, res) => {
 
 server.get("/site.html", checkAuth, (req, res) => {
     res.sendFile(path.join(appPath, "site.html"));
+});
+
+server.get("/api/videos", checkAuth, async (req, res) => {
+    try {
+        const videos = await conn.query(
+            "SELECT id, title, description, videoUrl FROM videos ORDER BY id DESC"
+        );
+        return res.json(videos);
+    } catch (error) {
+        console.error("Ошибка загрузки видео:", error);
+        return res.status(500).json({ error: "Не удалось загрузить видео" });
+    }
+});
+
+server.get("/api/videos/:id", checkAuth, async (req, res) => {
+    const videoId = Number(req.params.id);
+    if (!Number.isInteger(videoId)) {
+        return res.status(400).json({ error: "Некорректный идентификатор видео" });
+    }
+
+    try {
+        const videos = await conn.query(
+            `SELECT id, title, description, videoUrl,
+                    EXISTS(
+                        SELECT 1 FROM favorites
+                        WHERE favorites.videoId = videos.id AND favorites.userId = ?
+                    ) AS isFavorite
+             FROM videos WHERE id = ? LIMIT 1`,
+            [req.session.user.id, videoId]
+        );
+        if (videos.length === 0) return res.status(404).json({ error: "Видео не найдено" });
+        return res.json(videos[0]);
+    } catch (error) {
+        console.error("Ошибка загрузки видео:", error);
+        return res.status(500).json({ error: "Не удалось загрузить видео" });
+    }
+});
+
+server.get("/api/favorites", checkAuth, async (req, res) => {
+    try {
+        const videos = await conn.query(
+            `SELECT videos.id, videos.title, videos.description, videos.videoUrl
+             FROM favorites
+             JOIN videos ON videos.id = favorites.videoId
+             WHERE favorites.userId = ?
+             ORDER BY favorites.createdAt DESC`,
+            [req.session.user.id]
+        );
+        return res.json(videos);
+    } catch (error) {
+        console.error("Ошибка загрузки понравившихся видео:", error);
+        return res.status(500).json({ error: "Не удалось загрузить понравившиеся видео" });
+    }
+});
+
+server.post("/api/videos/:id/favorite", checkAuth, async (req, res) => {
+    const videoId = Number(req.params.id);
+    if (!Number.isInteger(videoId)) {
+        return res.status(400).json({ error: "Некорректный идентификатор видео" });
+    }
+
+    try {
+        const videos = await conn.query("SELECT id FROM videos WHERE id = ? LIMIT 1", [videoId]);
+        if (videos.length === 0) return res.status(404).json({ error: "Видео не найдено" });
+
+        const favorites = await conn.query(
+            "SELECT id FROM favorites WHERE userId = ? AND videoId = ? LIMIT 1",
+            [req.session.user.id, videoId]
+        );
+
+        if (favorites.length > 0) {
+            await conn.query("DELETE FROM favorites WHERE userId = ? AND videoId = ?", [
+                req.session.user.id,
+                videoId
+            ]);
+            return res.json({ isFavorite: false });
+        }
+
+        await conn.query("INSERT INTO favorites (userId, videoId) VALUES (?, ?)", [
+            req.session.user.id,
+            videoId
+        ]);
+        return res.json({ isFavorite: true });
+    } catch (error) {
+        console.error("Ошибка изменения лайка:", error);
+        return res.status(500).json({ error: "Не удалось изменить лайк" });
+    }
 });
 
 server.post("/reg", async (req, res) => {
@@ -122,11 +208,96 @@ server.post("/auth", async (req, res) => {
         if (!await verifyPassword(password, user.passwordHash)) {
             return res.status(401).json({ error: "Неверный email или пароль" });
         }
+        if (user.email == "admin")
+        {
+            req.session.user = {
+                id: user.id,
+                email: user.email
+            };
+            return req.session.save((error) => {
+                if (error) return res.status(500).json({ error: "Не удалось сохранить сессию" });
+                return res.json({ redirect: "/admin" });
+            });
+        }
 
         return saveSession(req, res, user);
     } catch (error) {
         console.error("Ошибка авторизации:", error);
         return res.status(500).json({ error: "Ошибка сервера" });
+    }
+});
+server.get("/admin", checkAdmin, (req, res) => {
+    return res.sendFile(path.join(appPath, "admin.html"));
+});
+
+server.get("/api/admin/videos", checkAdmin, async (req, res) => {
+    try {
+        const videos = await conn.query(
+            "SELECT id, title, description, videoUrl FROM videos ORDER BY id DESC"
+        );
+        return res.json(videos);
+    } catch (error) {
+        console.error("Ошибка загрузки видео для админки:", error);
+        return res.status(500).json({ error: "Не удалось загрузить видео" });
+    }
+});
+
+server.put("/api/admin/videos/:id", checkAdmin, async (req, res) => {
+    const videoId = Number(req.params.id);
+    const title = String(req.body.title || "").trim();
+    const description = String(req.body.description || "").trim();
+
+    if (!Number.isInteger(videoId)) {
+        return res.status(400).json({ error: "Некорректный идентификатор видео" });
+    }
+    if (!title || !description) {
+        return res.status(400).json({ error: "Название и описание не должны быть пустыми" });
+    }
+
+    try {
+        const result = await conn.query(
+            "UPDATE videos SET title = ?, description = ? WHERE id = ?",
+            [title, description, videoId]
+        );
+        if (result.affectedRows === 0) return res.status(404).json({ error: "Видео не найдено" });
+        return res.json({ message: "Видео изменено" });
+    } catch (error) {
+        console.error("Ошибка редактирования видео:", error);
+        return res.status(500).json({ error: "Не удалось изменить видео" });
+    }
+});
+
+server.delete("/api/admin/videos/:id", checkAdmin, async (req, res) => {
+    const videoId = Number(req.params.id);
+    if (!Number.isInteger(videoId)) {
+        return res.status(400).json({ error: "Некорректный идентификатор видео" });
+    }
+
+    try {
+        const videos = await conn.query(
+            "SELECT videoUrl FROM videos WHERE id = ? LIMIT 1",
+            [videoId]
+        );
+        if (videos.length === 0) return res.status(404).json({ error: "Видео не найдено" });
+
+        const remoteFile = `/var/www/videos/${path.basename(String(videos[0].videoUrl || ""))}`;
+        const sftp = new Client();
+        try {
+            await sftp.connect({
+                host: process.env.sftpHost,
+                username: process.env.sftpUsername,
+                password: process.env.sftpPassword
+            });
+            await sftp.delete(remoteFile).catch(() => {});
+        } finally {
+            await sftp.end().catch(() => {});
+        }
+
+        await conn.query("DELETE FROM videos WHERE id = ?", [videoId]);
+        return res.json({ message: "Видео удалено" });
+    } catch (error) {
+        console.error("Ошибка удаления видео:", error);
+        return res.status(500).json({ error: "Не удалось удалить видео" });
     }
 });
 
@@ -138,5 +309,45 @@ server.post("/logout", (req, res) => {
     });
 });
 
+const upload = multer({ dest: uploadPath });
+
+server.post("/api/upload", checkAdmin, upload.single("video"), async (req, res) => {
+    const title = String(req.body.title || "").trim();
+    const description = String(req.body.description || "").trim();
+
+    if (!title || !description || !req.file) {
+        if (req.file) await fs.unlink(req.file.path).catch(() => {});
+        return res.status(400).json({ error: "Заполните название, описание и выберите видео" });
+    }
+
+    const safeName = path.basename(req.file.originalname).replace(/[^a-zA-Z0-9._-]/g, "_");
+    const fileName = `${Date.now()}-${safeName}`;
+    const localPath = req.file.path;
+    const remotePath = `/var/www/videos/${fileName}`;
+    const videoBaseUrl = process.env.videoBaseUrl || `http://${process.env.sftpHost}/videos`;
+    const videoUrl = `${videoBaseUrl.replace(/\/$/, "")}/${encodeURIComponent(fileName)}`;
+    const sftp = new Client();
+
+    try {
+        await sftp.connect({
+            host: process.env.sftpHost,
+            username: process.env.sftpUsername,
+            password: process.env.sftpPassword
+        });
+        await sftp.put(localPath, remotePath);
+        await conn.query(
+            "INSERT INTO videos (title, description, videoUrl) VALUES (?, ?, ?)",
+            [title, description, videoUrl]
+        );
+
+        return res.status(201).json({ message: "Видео загружено!" });
+    } catch (error) {
+        console.error("Ошибка загрузки видео:", error.message);
+        return res.status(500).json({ error: `Не удалось отправить файл: ${error.message}` });
+    } finally {
+        await fs.unlink(localPath).catch(() => {});
+        await sftp.end().catch(() => {});
+    }
+});
 const port = process.env.port || 3001;
 server.listen(port, () => console.log(`Сервер работает на порту ${port}`));
