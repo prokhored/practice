@@ -30,13 +30,18 @@ server.use(session({
 const multer = require('multer');
 const Client = require('ssh2-sftp-client');
 const fs = require('fs/promises');
+
+const { attachDatabasePool } = require('@vercel/functions');
 const conn = mariadb.createPool({
+
     host: process.env.host,
     user: process.env.user,
+    ssl:false,
     password: process.env.password,
     database: process.env.database,
     connectionLimit: 5
 });
+attachDatabasePool(conn)
 
 function checkAuth(req, res, next) {
     if (req.session.user) return next();
