@@ -8,16 +8,24 @@ require("dotenv").config();
 
 const server = express();
 const appPath = path.join(__dirname, "public");
-const uploadPath = path.join(__dirname, "uploads");
+// Vercel allows writing only to /tmp. Locally keep the existing uploads folder.
+const uploadPath = process.env.VERCEL ? "/tmp/uploads" : path.join(__dirname, "uploads");
 fsSync.mkdirSync(uploadPath, { recursive: true });
+
+server.set("trust proxy", 1);
 
 server.use(express.urlencoded({ extended: true }));
 server.use(express.json());
 server.use(session({
-    secret: process.env.secret,
+    secret: process.env.secret || "development-secret",
     resave: false,
     saveUninitialized: false,
-    cookie: { httpOnly: true, secure: false, maxAge: 86400000 }
+    cookie: {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        maxAge: 86400000
+    }
 }));
 const multer = require('multer');
 const Client = require('ssh2-sftp-client');
@@ -349,5 +357,11 @@ server.post("/api/upload", checkAdmin, upload.single("video"), async (req, res) 
         await sftp.end().catch(() => {});
     }
 });
-const port = process.env.port || 3001;
-server.listen(port, () => console.log(`Сервер работает на порту ${port}`));
+// Vercel imports the Express app as a serverless function.
+// Keep listen() for local development and traditional Node hosting.
+if (!process.env.VERCEL) {
+    const port = process.env.port || 3001;
+    server.listen(port, () => console.log(`Сервер работает на порту ${port}`));
+}
+
+module.exports = server;
