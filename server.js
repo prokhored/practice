@@ -231,7 +231,7 @@ server.post("/auth", async (req, res) => {
             };
             return req.session.save((error) => {
                 if (error) return res.status(500).json({ error: "Не удалось сохранить сессию" });
-                return res.json({ redirect: "/admin" });
+                return res.json({ redirect: "/site.html" });
             });
         }
 
@@ -241,6 +241,13 @@ server.post("/auth", async (req, res) => {
         return res.status(500).json({ error: "Ошибка сервера" });
     }
 });
+server.get("/api/session", checkAuth, (req, res) => {
+    return res.json({
+        email: req.session.user.email,
+        isAdmin: req.session.user.email === "admin"
+    });
+});
+
 server.get("/admin", checkAdmin, (req, res) => {
     return res.sendFile(path.join(appPath, "admin.html"));
 });

@@ -205,6 +205,30 @@ a {
     background: #333333;
 }
 
+.admin-link,
+.back-to-site {
+    padding: 10px 14px;
+    border-radius: 8px;
+    color: white;
+    background: #0f0f0f;
+    text-decoration: none;
+}
+
+.admin-link {
+    position: absolute;
+    top: 15px;
+    right: 130px;
+}
+
+.admin-link:hover,
+.back-to-site:hover {
+    background: #333333;
+}
+
+.admin-link[hidden] {
+    display: none;
+}
+
 /* Адаптивная разметка */
 * {
     box-sizing: border-box;

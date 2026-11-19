@@ -29,6 +29,14 @@ body {
     gap: 16px;
 }
 
+.back-to-site {
+    padding: 10px 14px;
+    border-radius: 6px;
+    color: white;
+    background: #222;
+    text-decoration: none;
+}
+
 h1 {
     margin: 0 0 24px;
 }

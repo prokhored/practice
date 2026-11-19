@@ -2,6 +2,20 @@ const videoPage = document.getElementById("video-page");
 const searchInput = document.querySelector(".srchbar input");
 let videos = [];
 
+async function showAdminLink() {
+    const adminLink = document.getElementById("admin-link");
+    if (!adminLink) return;
+
+    try {
+        const response = await fetch("/api/session");
+        if (!response.ok) return;
+        const session = await response.json();
+        adminLink.hidden = !session.isAdmin;
+    } catch (error) {
+        adminLink.hidden = true;
+    }
+}
+
 function showError(message) {
     videoPage.innerHTML = "";
     const error = document.createElement("p");
@@ -133,10 +147,9 @@ searchInput.addEventListener("input", () => {
 document.querySelectorAll("[data-page]").forEach((link) => {
     link.addEventListener("click", (event) => {
         event.preventDefault();
-        if (link.dataset.page === "home") return showVideoList();
         if (link.dataset.page === "favorites") return loadFavorites();
-        return showDevelopment();
     });
 });
 
+showAdminLink();
 loadVideos();
