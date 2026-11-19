@@ -31,17 +31,19 @@ const multer = require('multer');
 const Client = require('ssh2-sftp-client');
 const fs = require('fs/promises');
 
-const { attachDatabasePool } = require('@vercel/functions');
-const conn = mariadb.createPool({
-
-    host: process.env.host,
-    user: process.env.user,
-    ssl:false,
-    password: process.env.password,
-    database: process.env.database,
+const databasePool = mariadb.createPool({
+    // Use DB_* variables on Vercel. The lowercase names remain supported locally.
+    host: process.env.DB_HOST || process.env.host,
+    port: Number(process.env.DB_PORT || 3306),
+    user: process.env.DB_USER || process.env.user,
+    password: process.env.DB_PASSWORD || process.env.password,
+    database: process.env.DB_NAME || process.env.database,
+    ssl: process.env.DB_SSL === "true"
+        ? { rejectUnauthorized: process.env.DB_SSL_REJECT_UNAUTHORIZED !== "false" }
+        : false,
     connectionLimit: 5
 });
-attachDatabasePool(conn)
+const conn = databasePool;
 
 function checkAuth(req, res, next) {
     if (req.session.user) return next();
