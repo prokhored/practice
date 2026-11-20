@@ -124,7 +124,15 @@ server.get("/api/videos/:id", checkAuth, async (req, res) => {
         return res.status(500).json({ error: "Не удалось загрузить видео" });
     }
 });
-
+server.get("/api/admin/users", checkAdmin, async (req, res) => {
+    try {
+        const users = await conn.query("SELECT id, email FROM users ORDER BY id DESC");
+        return res.json(users);
+    } catch (error) {
+        console.error("Ошибка загрузки пользователей:", error);
+        return res.status(500).json({ error: "Не удалось загрузить пользователей" });
+    }
+});
 server.get("/api/favorites", checkAuth, async (req, res) => {
     try {
         const videos = await conn.query(

@@ -1,6 +1,7 @@
 const form = document.getElementById("video-form");
 const message = document.getElementById("message");
 const videoList = document.getElementById("video-list");
+const userList = document.getElementById("user-list");
 
 async function loadVideos() {
     const response = await fetch("/api/admin/videos");
@@ -52,6 +53,32 @@ async function loadVideos() {
     });
 }
 
+async function loadUsers() {
+    const response = await fetch("/api/admin/users");
+    const users = await response.json();
+
+    if (!response.ok) throw new Error(users.error || "Не удалось загрузить пользователей");
+
+    userList.innerHTML = "";
+    if (users.length === 0) {
+        userList.textContent = "Пользователей пока нет";
+        return;
+    }
+
+    users.forEach((user) => {
+        const item = document.createElement("article");
+        item.className = "admin-user";
+
+        const email = document.createElement("strong");
+        email.textContent = user.email;
+        const id = document.createElement("small");
+        id.textContent = `ID: ${user.id}`;
+
+        item.append(email, id);
+        userList.append(item);
+    });
+}
+
 form.addEventListener("submit", async (event) => {
     event.preventDefault();
     message.textContent = "Загрузка видео...";
@@ -84,6 +111,10 @@ form.addEventListener("submit", async (event) => {
 
 loadVideos().catch(() => {
     videoList.textContent = "Не удалось загрузить список видео";
+});
+
+loadUsers().catch(() => {
+    userList.textContent = "Не удалось загрузить список пользователей";
 });
 
 document.getElementById("logout").addEventListener("click", async () => {
