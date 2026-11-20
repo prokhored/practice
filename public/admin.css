@@ -127,6 +127,30 @@ h2 {
     color: #777;
 }
 
+.admin-user-info {
+    min-width: 0;
+}
+
+.admin-user-info strong,
+.admin-user-info small {
+    display: block;
+}
+
+.admin-user-actions {
+    display: flex;
+    flex-shrink: 0;
+}
+
+.block-button {
+    color: white;
+    background: #b06000;
+}
+
+.block-button:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
 .admin-video-info small {
     margin-top: 4px;
     color: #777;

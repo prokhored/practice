@@ -101,17 +101,42 @@ const databasePool = mariadb.createPool({
 });
 const conn = databasePool;
 
-function checkAuth(req, res, next) {
-    if (req.session.user) return next();
-    if (req.path.startsWith("/api/")) {
-        return res.status(401).json({ error: "Требуется авторизация" });
+async function checkAuth(req, res, next) {
+    if (!req.session.user) {
+        if (req.path.startsWith("/api/")) {
+            return res.status(401).json({ error: "Требуется авторизация" });
+        }
+        return res.redirect("/auth.html");
     }
-    return res.redirect("/auth.html");
+
+    try {
+        const users = await conn.query(
+            "SELECT id, email, isBlocked FROM users WHERE id = ? LIMIT 1",
+            [req.session.user.id]
+        );
+        if (users.length === 0 || users[0].isBlocked) {
+            req.session.destroy();
+            if (req.path.startsWith("/api/")) {
+                return res.status(403).json({ error: "Пользователь заблокирован" });
+            }
+            return res.redirect("/auth.html");
+        }
+        req.session.user = { id: users[0].id, email: users[0].email };
+        return next();
+    } catch (error) {
+        console.error("Ошибка проверки пользователя:", error);
+        return res.status(500).json({ error: "Не удалось проверить пользователя" });
+    }
 }
 
 function checkAdmin(req, res, next) {
-    if (req.session.user && req.session.user.email === "admin") return next();
-    return res.redirect("/auth.html");
+    return checkAuth(req, res, () => {
+        if (req.session.user.email === "admin") return next();
+        if (req.path.startsWith("/api/")) {
+            return res.status(403).json({ error: "Доступ разрешён только администратору" });
+        }
+        return res.redirect("/site.html");
+    });
 }
 
 async function hashPassword(password) {
@@ -144,7 +169,6 @@ server.get("/", (req, res) => {
 server.get("/site.html", checkAuth, (req, res) => {
     res.sendFile(path.join(appPath, "site.html"));
 });
-
 server.get("/api/videos", checkAuth, async (req, res) => {
     try {
         const videos = await conn.query(
@@ -182,11 +206,42 @@ server.get("/api/videos/:id", checkAuth, async (req, res) => {
 });
 server.get("/api/admin/users", checkAdmin, async (req, res) => {
     try {
-        const users = await conn.query("SELECT id, email FROM users ORDER BY id DESC");
+        const users = await conn.query(
+            "SELECT id, email, isBlocked FROM users ORDER BY id DESC"
+        );
         return res.json(users);
     } catch (error) {
         console.error("Ошибка загрузки пользователей:", error);
         return res.status(500).json({ error: "Не удалось загрузить пользователей" });
+    }
+});
+
+server.patch("/api/admin/users/:id/block", checkAdmin, async (req, res) => {
+    const userId = Number(req.params.id);
+    const blocked = req.body.blocked;
+
+    if (!Number.isInteger(userId) || ![true, false].includes(blocked)) {
+        return res.status(400).json({ error: "Некорректные данные блокировки" });
+    }
+
+    try {
+        const users = await conn.query(
+            "SELECT id, email FROM users WHERE id = ? LIMIT 1",
+            [userId]
+        );
+        if (users.length === 0) return res.status(404).json({ error: "Пользователь не найден" });
+        if (users[0].email === "admin") {
+            return res.status(400).json({ error: "Нельзя заблокировать администратора" });
+        }
+
+        await conn.query("UPDATE users SET isBlocked = ? WHERE id = ?", [blocked ? 1 : 0, userId]);
+        return res.json({
+            message: blocked ? "Пользователь заблокирован" : "Пользователь разблокирован",
+            isBlocked: blocked
+        });
+    } catch (error) {
+        console.error("Ошибка изменения блокировки пользователя:", error);
+        return res.status(500).json({ error: "Не удалось изменить блокировку пользователя" });
     }
 });
 server.get("/api/favorites", checkAuth, async (req, res) => {
@@ -278,12 +333,15 @@ server.post("/auth", async (req, res) => {
 
     try {
         const users = await conn.query(
-            "SELECT id, email, passwordHash FROM users WHERE email = ? LIMIT 1",
+            "SELECT id, email, passwordHash, isBlocked FROM users WHERE email = ? LIMIT 1",
             [email]
         );
         if (users.length === 0) return res.status(401).json({ error: "Неверный email или пароль" });
 
         const user = users[0];
+        if (user.isBlocked) {
+            return res.status(403).json({ error: "Ваш аккаунт заблокирован" });
+        }
         if (!await verifyPassword(password, user.passwordHash)) {
             return res.status(401).json({ error: "Неверный email или пароль" });
         }
