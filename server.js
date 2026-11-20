@@ -1,9 +1,9 @@
 const bcrypt = require("bcrypt");
 const express = require("express");
-const session = require("express-session");
 const mariadb = require("mariadb");
 const path = require("path");
 const fsSync = require("fs");
+const crypto = require("crypto");
 require("dotenv").config();
 
 const server = express();
@@ -16,17 +16,73 @@ server.set("trust proxy", 1);
 
 server.use(express.urlencoded({ extended: true }));
 server.use(express.json());
-server.use(session({
-    secret: process.env.secret || "development-secret",
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
-        maxAge: 86400000
+const sessionSecret = process.env.SESSION_SECRET || process.env.secret || "development-secret";
+const sessionCookieName = "practice_session";
+
+function encodeSession(sessionData) {
+    const payload = Buffer.from(JSON.stringify(sessionData)).toString("base64url");
+    const signature = crypto.createHmac("sha256", sessionSecret).update(payload).digest("base64url");
+    return `${payload}.${signature}`;
+}
+
+function decodeSession(value) {
+    if (!value) return null;
+    const [payload, signature] = value.split(".");
+    if (!payload || !signature) return null;
+
+    const expectedSignature = crypto.createHmac("sha256", sessionSecret)
+        .update(payload)
+        .digest("base64url");
+    const provided = Buffer.from(signature);
+    const expected = Buffer.from(expectedSignature);
+    if (provided.length !== expected.length || !crypto.timingSafeEqual(provided, expected)) {
+        return null;
     }
-}));
+
+    try {
+        return JSON.parse(Buffer.from(payload, "base64url").toString("utf8"));
+    } catch (error) {
+        return null;
+    }
+}
+
+function parseCookies(header = "") {
+    return header.split(";").reduce((cookies, part) => {
+        const separator = part.indexOf("=");
+        if (separator === -1) return cookies;
+        const key = part.slice(0, separator).trim();
+        const value = part.slice(separator + 1).trim();
+        cookies[key] = decodeURIComponent(value);
+        return cookies;
+    }, {});
+}
+
+function setSessionCookie(res, sessionData) {
+    const secure = process.env.NODE_ENV === "production" ? "; Secure" : "";
+    res.setHeader(
+        "Set-Cookie",
+        `${sessionCookieName}=${encodeURIComponent(encodeSession(sessionData))}; Max-Age=86400; Path=/; HttpOnly; SameSite=Lax${secure}`
+    );
+}
+
+server.use((req, res, next) => {
+    const cookies = parseCookies(req.headers.cookie);
+    const sessionData = decodeSession(cookies[sessionCookieName]) || {};
+
+    req.session = sessionData;
+    req.session.save = (callback) => {
+        delete req.session.save;
+        delete req.session.destroy;
+        setSessionCookie(res, req.session);
+        if (callback) callback(null);
+    };
+    req.session.destroy = (callback) => {
+        res.setHeader("Set-Cookie", `${sessionCookieName}=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax`);
+        req.session = {};
+        if (callback) callback(null);
+    };
+    next();
+});
 const multer = require('multer');
 const Client = require('ssh2-sftp-client');
 const fs = require('fs/promises');
