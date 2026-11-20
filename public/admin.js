@@ -68,13 +68,30 @@ async function loadUsers() {
     users.forEach((user) => {
         const item = document.createElement("article");
         item.className = "admin-user";
+        item.innerHTML = '<div class="admin-user-info"></div><div class="admin-user-actions"><button class="block-button" type="button"></button></div>';
 
         const email = document.createElement("strong");
         email.textContent = user.email;
         const id = document.createElement("small");
         id.textContent = `ID: ${user.id}`;
+        const blockButton = item.querySelector(".block-button");
+        blockButton.textContent = user.isBlocked ? "Разблокировать" : "Заблокировать";
+        blockButton.disabled = user.email === "admin";
+        blockButton.addEventListener("click", async () => {
+            const blocked = !Boolean(user.isBlocked);
+            if (!confirm(`${blocked ? "Заблокировать" : "Разблокировать"} пользователя ${user.email}?`)) return;
 
-        item.append(email, id);
+            const blockResponse = await fetch(`/api/admin/users/${user.id}/block`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ blocked })
+            });
+            const data = await blockResponse.json();
+            message.textContent = data.message || data.error;
+            if (blockResponse.ok) loadUsers();
+        });
+
+        item.querySelector(".admin-user-info").append(email, id);
         userList.append(item);
     });
 }
