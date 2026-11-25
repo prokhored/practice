@@ -337,7 +337,7 @@ server.post("/auth", async (req, res) => {
             "SELECT id, email, passwordHash, isBlocked FROM users WHERE email = ? LIMIT 1",
             [email]
         );
-        if (users.length === 0) return res.status(401).json({ error: "Неверный email или пароль" });
+        if (users.length === 0) return res.status(401).json({ error: "Аккаунт с таким email не найден!" });
 
         const user = users[0];
         if (user.isBlocked) {
