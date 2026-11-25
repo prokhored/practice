@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Админка</title>
+    <link rel="stylesheet" href="admin.css">
+</head>
+<body>
+    <main class="admin-page">
+        <section class="admin-card">
+            <div class="admin-header">
+                <h1>Панель управления</h1>
+                <a class="back-to-site" href="/site.html">← Смотреть видео</a>
+                <button id="logout" type="button">Выйти</button>
+            </div>
+
+            <form id="video-form">
+                <label for="title">Название</label>
+                <input id="title" name="title" type="text" required>
+
+                <label for="description">Описание</label>
+                <textarea id="description" name="description" rows="5" required></textarea>
+
+                <label for="video">Файл видео</label>
+                <input id="video" name="video" type="file" accept="video/*" required>
+
+                <button class="submit-button" type="submit">Добавить видео</button>
+                <p id="message" role="alert"></p>
+            </form>
+
+            <h2>Видео</h2>
+            <div id="video-list"></div>
+
+            <h2>Пользователи</h2>
+            <div id="user-list" aria-live="polite"></div>
+        </section>
+    </main>
+    <script src="admin.js"></script>
+</body>
+</html>

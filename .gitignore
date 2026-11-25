@@ -24,6 +24,9 @@ report/
 !public/videopage.html
 !public/videopage.css
 !public/videopage.js
+!public/admin.html
+!public/admin.css
+!public/admin.js
 !public/MeTube.html
 !public/metube.png
 !public/MeTube_files/
