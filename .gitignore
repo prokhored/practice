@@ -14,9 +14,16 @@ report/
 !.env.example
 !.gitignore
 !server.js
+!api/
+!api/index.js
 !public/auth.html
+!public/auth.css
 !public/site.html
+!public/site.css
+!public/site.js
 !public/videopage.html
+!public/videopage.css
+!public/videopage.js
 !public/MeTube.html
 !public/metube.png
 !public/MeTube_files/
