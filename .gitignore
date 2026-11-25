@@ -4,3 +4,24 @@ node_modules/
 .vercel/
 readme.md
 task.txt
+uml-actors.md
+report/
+
+# Keep only the files intentionally published to GitHub.
+*
+!*/
+!*.json
+!.env.example
+!.gitignore
+!server.js
+!public/auth.html
+!public/site.html
+!public/videopage.html
+!public/MeTube.html
+!public/metube.png
+!public/MeTube_files/
+!public/MeTube_files/**
+
+# Never publish local dependencies or workspace metadata.
+node_modules/
+.obsidian/

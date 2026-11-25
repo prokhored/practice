@@ -243,6 +243,7 @@ server.patch("/api/admin/users/:id/block", checkAdmin, async (req, res) => {
         console.error("Ошибка изменения блокировки пользователя:", error);
         return res.status(500).json({ error: "Не удалось изменить блокировку пользователя" });
     }
+
 });
 server.get("/api/favorites", checkAuth, async (req, res) => {
     try {
