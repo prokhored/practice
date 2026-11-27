@@ -1,3 +1,4 @@
+// финальная версия проекта
 const videoPage = document.getElementById("video-page");
 const searchInput = document.querySelector(".srchbar input");
 let videos = [];

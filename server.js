@@ -1,3 +1,4 @@
+// финальная версия проекта
 const bcrypt = require("bcrypt");
 const express = require("express");
 const mariadb = require("mariadb");

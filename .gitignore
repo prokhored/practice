@@ -1,3 +1,4 @@
+# финальная версия проекта
 .env
 uploads/
 node_modules/
@@ -6,6 +7,8 @@ readme.md
 task.txt
 uml-actors.md
 report/
+
+
 
 # Keep only the files intentionally published to GitHub.
 *

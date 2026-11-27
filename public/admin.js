@@ -1,3 +1,4 @@
+// финальная версия проекта
 const form = document.getElementById("video-form");
 const message = document.getElementById("message");
 const videoList = document.getElementById("video-list");
